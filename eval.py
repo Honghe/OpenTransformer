@@ -18,8 +18,11 @@ logger = logging.getLogger(__name__)
 
 
 def main(args):
-
-    checkpoint = torch.load(args.load_model)
+    if args.ngpu > 0:
+        device = torch.device('cuda')
+    else:
+        device = torch.device('cpu')
+    checkpoint = torch.load(args.load_model, map_location=device)
 
     if args.config is not None:
         with open(args.config, 'r') as f:
@@ -70,12 +73,12 @@ def main(args):
         if args.ngpu > 0: lm.cuda()
     else:
         lm = None
-        lm_type = None   
+        lm_type = None
 
     data_loader = FeatureLoader(params, args.decode_set, is_eval=True)
     idx2unit = data_loader.dataset.idx2unit
     recognizer = build_recognizer(model_type, model, lm, args, idx2unit)
-  
+
     totals = len(data_loader.dataset)
 
     expdir = os.path.join('egs', params['data']['name'], 'exp', params['train']['save_name'])
@@ -112,7 +115,7 @@ def main(args):
 
     if not os.path.exists(decode_dir):
         os.makedirs(decode_dir)
-    
+
     writer = open(os.path.join(decode_dir, 'predict.txt'), 'w')
     detail_writer = open(os.path.join(decode_dir, 'predict.log'), 'w')
 
@@ -125,7 +128,7 @@ def main(args):
 
         if args.ngpu > 0:
             inputs = map_to_cuda(inputs)
-            
+
         enc_inputs = inputs['inputs']
         enc_mask = inputs['mask']
 
@@ -153,11 +156,11 @@ def main(args):
             print_info = '[%d / %d ] %s - truth             : %s' % (n, totals, utt_id[b], truth)
             logger.info(print_info)
             detail_writer.write(print_info+'\n')
-            total_tokens += len(truth.split())  
+            total_tokens += len(truth.split())
 
             nbest_min_false_tokens = 1e10
             for i in range(len(preds[b])):
-                
+
                 pred = preds[b][i]
                 if args.piece2word:
                     pred = ''.join(preds[b][i].split()).replace('▁', ' ')
@@ -166,11 +169,11 @@ def main(args):
                 if i == 0:
                     false_tokens += n_diff
                 nbest_min_false_tokens = min(nbest_min_false_tokens, n_diff)
-                              
+
                 print_info = '[%d / %d ] %s - pred-%2d (%3.4f) : %s' % (n, totals, utt_id[b], i, float(scores.cpu()[b, i]), pred)
                 logger.info(print_info)
                 detail_writer.write(print_info+'\n')
-                
+
             writer.write(utt_id[b] + ' ' + preds[b][0] + '\n')
             top_n_false_tokens += nbest_min_false_tokens
 

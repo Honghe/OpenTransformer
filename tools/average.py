@@ -26,7 +26,11 @@ def average_chkpt(datadir, start, end):
     num_models = len(chkpts)
 
     for chkpt in chkpts:
-        state = torch.load(os.path.join(datadir, chkpt))
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+        else:
+            device = torch.device('cpu')
+        state = torch.load(os.path.join(datadir, chkpt), map_location=device)
         # Copies over the settings from the first checkpoint
 
         if new_state is None:
